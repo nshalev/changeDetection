@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Change Detection Task</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16202b;
+  --ink-soft:#54646f;
+  --paper:#e9edf0;
+  --panel:#ffffff;
+  --line:#ccd6dd;
+  --line-soft:#e2e8ed;
+  --signal:#0f6b62;
+  --signal-dim:#d7ebe8;
+  --warn:#a8480d;
+  --warn-dim:#f8e6d9;
+  --grey-bg:#808080;
+  --radius:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;
+}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif;letter-spacing:-0.015em}
+
+/* ---------- config ---------- */
+.wrap{max-width:840px;margin:0 auto;padding:48px 24px 160px}
+.masthead{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:34px}
+.masthead h1{font-size:34px;font-weight:700;line-height:1.1}
+.masthead p{color:var(--ink-soft);margin-top:8px;max-width:62ch}
+
+fieldset{
+  border:none;
+  border-left:2px solid var(--line);
+  padding:2px 0 26px 22px;
+  margin-bottom:30px;
+}
+fieldset legend{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:600;
+  font-size:19px;
+  margin-left:-24px;
+  padding-left:22px;
+  border-left:2px solid var(--signal);
+  margin-bottom:16px;
+  width:100%;
+}
+.hint{color:var(--ink-soft);font-size:13.5px;margin:-6px 0 16px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px 20px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:13.5px;font-weight:500;color:var(--ink-soft)}
+.field .unit{color:var(--line);font-weight:400}
+input[type=text],input[type=number],select{
+  font-family:inherit;font-size:15px;font-variant-numeric:tabular-nums;
+  padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--panel);color:var(--ink);width:100%;
+}
+input:focus-visible,select:focus-visible,button:focus-visible,.chk:focus-within{
+  outline:2px solid var(--signal);outline-offset:2px;
+}
+select{cursor:pointer}
+
+.setsizes{display:flex;gap:10px;flex-wrap:wrap}
+.chk{
+  display:flex;align-items:center;gap:8px;cursor:pointer;
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:9px 15px;background:var(--panel);font-weight:500;
+  transition:border-color .12s,background .12s;
+}
+.chk input{accent-color:var(--signal);width:15px;height:15px;cursor:pointer}
+.chk.on{border-color:var(--signal);background:var(--signal-dim)}
+.chk.off{opacity:.45}
+
+.toggle{display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer}
+.toggle input{accent-color:var(--signal);width:15px;height:15px;cursor:pointer}
+
+/* live run summary */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;background:var(--panel);
+  border-top:1px solid var(--line);box-shadow:0 -6px 24px rgba(22,32,43,.07);
+  z-index:20;
+}
+.dock-inner{
+  max-width:840px;margin:0 auto;padding:14px 24px;
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+}
+.dock .readout{flex:1;min-width:260px;font-size:14px;color:var(--ink-soft)}
+.dock .readout strong{color:var(--ink);font-weight:600}
+.dock .readout .seq{font-size:13px;margin-top:2px;display:block}
+button{
+  font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
+  border:none;border-radius:var(--radius);padding:11px 22px;
+  background:var(--signal);color:#fff;transition:filter .12s;
+}
+button:hover{filter:brightness(1.1)}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+button[disabled]{opacity:.4;cursor:not-allowed;filter:none}
+.alert{
+  border-left:3px solid var(--warn);background:var(--warn-dim);
+  padding:10px 14px;border-radius:0 var(--radius) var(--radius) 0;
+  font-size:14px;margin-bottom:14px;
+}
+.alert:empty{display:none}
+
+/* ---------- runtime screens ---------- */
+.screen{display:none}
+.screen.active{display:block}
+#screen-message,#screen-task{
+  position:fixed;inset:0;background:var(--grey-bg);z-index:40;
+  display:none;align-items:center;justify-content:center;
+}
+#screen-message.active,#screen-task.active{display:flex}
+.msg-card{
+  max-width:620px;background:var(--panel);border-radius:8px;
+  padding:38px 42px;text-align:left;
+}
+.msg-card h2{font-size:25px;margin-bottom:14px}
+.msg-card p{margin-bottom:12px}
+.msg-card ol{margin:0 0 18px 20px}
+.msg-card li{margin-bottom:7px}
+.msg-card .keys{
+  display:flex;gap:12px;margin:18px 0 22px;flex-wrap:wrap;
+}
+.keycap{
+  border:1px solid var(--line);border-bottom-width:3px;border-radius:5px;
+  padding:8px 14px;font-weight:600;background:#f6f8f9;
+}
+.msg-card .go{margin-top:6px}
+
+#arena{position:relative}
+.item{position:absolute;border-radius:2px}
+.fixation{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  color:#000;font-size:24px;line-height:1;user-select:none;
+}
+#respbar{
+  position:fixed;left:0;right:0;bottom:34px;display:flex;
+  justify-content:center;gap:14px;visibility:hidden;
+}
+#respbar button{
+  background:rgba(255,255,255,.9);color:var(--ink);
+  border:1px solid rgba(0,0,0,.25);min-width:132px;
+  font-size:26px;line-height:1;padding:10px 22px;
+}
+#feedback{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  visibility:hidden;white-space:nowrap;
+}
+#feedback .caption{
+  font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:#3a3a3a;
+}
+#progress{
+  position:fixed;top:0;left:0;height:3px;background:#000;opacity:.35;width:0;
+  transition:width .25s;
+}
+#abort{
+  position:fixed;top:12px;right:14px;font-size:12.5px;font-weight:500;
+  background:transparent;color:#3a3a3a;border:1px solid rgba(0,0,0,.25);
+  padding:5px 11px;opacity:.5;
+}
+#abort:hover{opacity:1;filter:none}
+
+/* ---------- results ---------- */
+table{border-collapse:collapse;width:100%;margin:14px 0 8px;font-size:14px}
+th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line-soft)}
+th:first-child,td:first-child{text-align:left}
+thead th{border-bottom:1.5px solid var(--ink);font-weight:600;font-size:13px;color:var(--ink-soft)}
+tbody tr:last-child td{border-bottom:1px solid var(--line)}
+.k-cell{font-weight:600}
+.rowbtns{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+.note{font-size:13.5px;color:var(--ink-soft);max-width:70ch;margin-top:16px}
+
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(22,32,43,.55);z-index:60;display:none;align-items:center;justify-content:center}
+#modal.active{display:flex}
+.modal-card{background:var(--panel);border-radius:8px;padding:30px 32px;max-width:440px}
+.modal-card h3{font-size:20px;margin-bottom:10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ======================= CONFIGURATION ======================= -->
+<div id="screen-config" class="screen active">
+<div class="wrap">
+  <div class="masthead">
+    <h1>Change detection</h1>
+    <p>Single-probe visual working memory task. A memory array of coloured squares appears briefly, and after a blank retention interval one square returns at a previously occupied location. The participant judges whether its colour matches.</p>
+  </div>
+
+  <div class="alert" id="alert"></div>
+
+  <fieldset>
+    <legend>Participant</legend>
+    <div class="grid">
+      <div class="field">
+        <label for="pid">Participant number</label>
+        <input type="text" id="pid" placeholder="e.g. 101">
+      </div>
+      <div class="field">
+        <label for="grp">Group</label>
+        <input type="text" id="grp" placeholder="e.g. control">
+      </div>
+      <div class="field">
+        <label for="age">Age <span class="unit">years</span></label>
+        <input type="number" id="age" min="3" max="120" step="1" placeholder="e.g. 24">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Design</legend>
+    <p class="hint">Choose one or two set sizes. With two, each runs in its own block.</p>
+    <div class="setsizes" id="setsizes">
+      <label class="chk"><input type="checkbox" value="2"> 2 items</label>
+      <label class="chk"><input type="checkbox" value="4"> 4 items</label>
+      <label class="chk on"><input type="checkbox" value="6" checked> 6 items</label>
+      <label class="chk"><input type="checkbox" value="8"> 8 items</label>
+    </div>
+    <div class="grid" style="margin-top:18px">
+      <div class="field">
+        <label for="blocks">Blocks per set size</label>
+        <input type="number" id="blocks" value="3" min="1" max="20" step="1">
+      </div>
+      <div class="field">
+        <label for="tpb">Trials per block <span class="unit">even</span></label>
+        <input type="number" id="tpb" value="30" min="2" max="200" step="2">
+      </div>
+      <div class="field">
+        <label for="order">Block order</label>
+        <select id="order">
+          <option value="counter">Counterbalanced by participant number</option>
+          <option value="asc">Smaller set size first</option>
+          <option value="desc">Larger set size first</option>
+          <option value="alt">Alternating across blocks</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="practice">Practice trials <span class="unit">with feedback</span></label>
+        <input type="number" id="practice" value="8" min="0" max="60" step="2">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Timing</legend>
+    <p class="hint">Canonical values run 100 to 500 ms exposure and a 900 ms retention interval.</p>
+    <div class="grid">
+      <div class="field">
+        <label for="t_fix">Fixation before array <span class="unit">ms</span></label>
+        <input type="number" id="t_fix" value="700" min="0" max="5000" step="50">
+      </div>
+      <div class="field">
+        <label for="t_exp">Array exposure <span class="unit">ms</span></label>
+        <input type="number" id="t_exp" value="200" min="16" max="5000" step="10">
+      </div>
+      <div class="field">
+        <label for="t_ret">Retention interval <span class="unit">ms</span></label>
+        <input type="number" id="t_ret" value="900" min="0" max="10000" step="50">
+      </div>
+      <div class="field">
+        <label for="t_lim">Response limit <span class="unit">ms, 0 = none</span></label>
+        <input type="number" id="t_lim" value="5000" min="0" max="20000" step="100">
+      </div>
+      <div class="field">
+        <label for="t_fb">Feedback duration <span class="unit">ms</span></label>
+        <input type="number" id="t_fb" value="500" min="0" max="3000" step="50">
+      </div>
+      <div class="field">
+        <label for="t_iti">Intertrial interval <span class="unit">ms</span></label>
+        <input type="number" id="t_iti" value="800" min="0" max="10000" step="50">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Display</legend>
+    <div class="grid">
+      <div class="field">
+        <label for="d_item">Square size <span class="unit">px</span></label>
+        <input type="number" id="d_item" value="46" min="10" max="200" step="2">
+      </div>
+      <div class="field">
+        <label for="d_area">Array region <span class="unit">px, square</span></label>
+        <input type="number" id="d_area" value="520" min="150" max="1200" step="10">
+      </div>
+      <div class="field">
+        <label for="d_sep">Minimum separation <span class="unit">px, centre to centre</span></label>
+        <input type="number" id="d_sep" value="110" min="20" max="400" step="5">
+      </div>
+      <div class="field">
+        <label for="palette">Colour set</label>
+        <select id="palette">
+          <option value="9">9 colours</option>
+          <option value="7">7 colours (Luck &amp; Vogel, 1997)</option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Response</legend>
+    <div class="grid">
+      <div class="field">
+        <label for="keymap">Key mapping</label>
+        <select id="keymap">
+          <option value="sd">S = same, D = different</option>
+          <option value="fj">F = same, J = different</option>
+          <option value="arrows">Left arrow = same, right arrow = different</option>
+        </select>
+      </div>
+      <div class="field" style="justify-content:flex-end;gap:10px">
+        <label class="toggle"><input type="checkbox" id="showbtns" checked> Show on-screen response buttons</label>
+        <label class="toggle"><input type="checkbox" id="fbmain" checked> Give feedback during test trials</label>
+      </div>
+    </div>
+  </fieldset>
+</div>
+
+<div class="dock">
+  <div class="dock-inner">
+    <div class="readout" id="readout"></div>
+    <button id="startBtn">Start task</button>
+  </div>
+</div>
+</div>
+
+<!-- ======================= MESSAGE SCREEN ======================= -->
+<div id="screen-message">
+  <div class="msg-card" id="msgCard"></div>
+</div>
+
+<!-- ======================= TASK SCREEN ======================= -->
+<div id="screen-task">
+  <div id="progress"></div>
+  <button id="abort" class="ghost">End session</button>
+  <div id="arena"></div>
+  <div id="feedback"></div>
+  <div id="respbar">
+    <button id="btnSame" aria-label="Same colour">&#10003;</button>
+    <button id="btnDiff" aria-label="Different colour">&#10007;</button>
+  </div>
+</div>
+
+<!-- ======================= RESULTS ======================= -->
+<div id="screen-results" class="screen">
+  <div class="wrap">
+    <div class="masthead">
+      <h1 id="resTitle">Session complete</h1>
+      <p id="resSub"></p>
+    </div>
+    <div id="resTable"></div>
+    <p class="note" id="resNote"></p>
+    <div class="rowbtns">
+      <button id="dlTrials">Download trial data</button>
+      <button id="dlSummary" class="ghost">Download summary</button>
+      <button id="backCfg" class="ghost">Back to configuration</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= MODAL ======================= -->
+<div id="modal">
+  <div class="modal-card">
+    <h3>End the session now?</h3>
+    <p id="modalBody"></p>
+    <div class="rowbtns">
+      <button id="modalYes">End and save data</button>
+      <button id="modalNo" class="ghost">Keep going</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   Change detection task, single-probe variant
+   Cowan (2001) K = N(H - FA); Pashler (1988) K = N(H - FA)/(1 - FA)
+   ===================================================================== */
+
+const PALETTE9 = [
+  {name:'red',      hex:'#ff0000'},
+  {name:'green',    hex:'#00c000'},
+  {name:'blue',     hex:'#0000ff'},
+  {name:'yellow',   hex:'#ffff00'},
+  {name:'magenta',  hex:'#ff00ff'},
+  {name:'cyan',     hex:'#00ffff'},
+  {name:'orange',   hex:'#ff8000'},
+  {name:'black',    hex:'#000000'},
+  {name:'white',    hex:'#ffffff'}
+];
+const PALETTE7 = [
+  {name:'red',    hex:'#ff0000'},
+  {name:'blue',   hex:'#0000ff'},
+  {name:'violet', hex:'#8000ff'},
+  {name:'green',  hex:'#00c000'},
+  {name:'yellow', hex:'#ffff00'},
+  {name:'black',  hex:'#000000'},
+  {name:'white',  hex:'#ffffff'}
+];
+
+const KEYMAPS = {
+  sd:     {same:'s',        diff:'d',         sameLabel:'S', diffLabel:'D'},
+  fj:     {same:'f',        diff:'j',         sameLabel:'F', diffLabel:'J'},
+  arrows: {same:'arrowleft',diff:'arrowright',sameLabel:'\u2190', diffLabel:'\u2192'}
+};
+
+let CFG = {};
+let S = {};
+
+const $ = id => document.getElementById(id);
+const rnd = n => Math.floor(Math.random()*n);
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];} return a; };
+
+function wait(ms){
+  return new Promise(res=>{
+    if(ms<=0) return res(performance.now());
+    const t0 = performance.now();
+    (function step(){
+      const now = performance.now();
+      if(now - t0 >= ms) res(now); else requestAnimationFrame(step);
+    })();
+  });
+}
+
+/* ---------------- configuration screen ---------------- */
+
+function selectedSetSizes(){
+  return [...document.querySelectorAll('#setsizes input:checked')]
+    .map(c=>parseInt(c.value,10)).sort((a,b)=>a-b);
+}
+
+function paintSetSizeChips(){
+  const boxes = [...document.querySelectorAll('#setsizes input')];
+  const n = boxes.filter(b=>b.checked).length;
+  boxes.forEach(b=>{
+    b.parentElement.classList.toggle('on', b.checked);
+    b.parentElement.classList.toggle('off', !b.checked && n>=2);
+    b.disabled = !b.checked && n>=2;
+  });
+}
+
+function readConfig(){
+  const km = $('keymap').value;
+  return {
+    pid: $('pid').value.trim(),
+    group: $('grp').value.trim(),
+    age: $('age').value.trim(),
+    setSizes: selectedSetSizes(),
+    blocksPerSize: +$('blocks').value,
+    trialsPerBlock: +$('tpb').value,
+    order: $('order').value,
+    practice: +$('practice').value,
+    tFix: +$('t_fix').value,
+    tExp: +$('t_exp').value,
+    tRet: +$('t_ret').value,
+    tLimit: +$('t_lim').value,
+    tFb: +$('t_fb').value,
+    tIti: +$('t_iti').value,
+    itemSize: +$('d_item').value,
+    areaSize: +$('d_area').value,
+    minSep: +$('d_sep').value,
+    paletteSize: +$('palette').value,
+    keymap: km,
+    keys: KEYMAPS[km],
+    showButtons: $('showbtns').checked,
+    feedbackMain: $('fbmain').checked
+  };
+}
+
+function validate(c){
+  const errs = [];
+  if(!c.pid) errs.push('Enter a participant number.');
+  if(!c.setSizes.length) errs.push('Select at least one set size.');
+  if(c.trialsPerBlock % 2 !== 0) errs.push('Trials per block must be even so change and no-change trials balance.');
+  const maxN = Math.max(...c.setSizes, 0);
+  if(c.paletteSize <= maxN) errs.push('The colour set must hold more colours than the largest set size, since a changed probe takes a colour absent from the array.');
+  const perRow = Math.floor(c.areaSize / c.minSep);
+  if(perRow*perRow < maxN) errs.push('The array region is too small for the largest set size at this minimum separation.');
+  return errs;
+}
+
+function updateReadout(){
+  paintSetSizeChips();
+  const c = readConfig();
+  const errs = validate(c);
+  $('alert').textContent = errs.join(' ');
+  $('startBtn').disabled = errs.length>0;
+
+  const nBlocks = c.setSizes.length * c.blocksPerSize;
+  const nTrials = nBlocks * c.trialsPerBlock;
+  const perTrial = c.tFix + c.tExp + c.tRet + 900 + c.tIti + (c.feedbackMain ? c.tFb : 0);
+  const mins = Math.round((nTrials*perTrial + c.practice*perTrial)/60000);
+  const seq = buildBlockPlan(c).map(b=>b.setSize).join(' \u2192 ');
+  $('readout').innerHTML =
+    `<strong>${nBlocks}</strong> blocks &nbsp;·&nbsp; <strong>${nTrials}</strong> test trials` +
+    (c.practice? ` &nbsp;·&nbsp; ${c.practice} practice` : '') +
+    ` &nbsp;·&nbsp; about <strong>${mins}</strong> min` +
+    `<span class="seq">Set size order: ${seq||'\u2014'}</span>`;
+}
+
+function buildBlockPlan(c){
+  const sizes = c.setSizes.slice();
+  if(!sizes.length) return [];
+  let seq;
+  if(sizes.length===1){
+    seq = Array(c.blocksPerSize).fill(sizes[0]);
+  } else {
+    let ordered = sizes.slice();
+    if(c.order==='desc') ordered.reverse();
+    if(c.order==='counter'){
+      const digits = (c.pid.match(/\d+/g)||['0']).join('');
+      if(parseInt(digits,10) % 2 === 1) ordered.reverse();
+    }
+    if(c.order==='alt'){
+      seq = [];
+      for(let i=0;i<c.blocksPerSize*ordered.length;i++) seq.push(ordered[i%ordered.length]);
+    } else {
+      seq = [];
+      ordered.forEach(n=>{ for(let i=0;i<c.blocksPerSize;i++) seq.push(n); });
+    }
+  }
+  return seq.map((n,i)=>({index:i+1, setSize:n}));
+}
+
+/* ---------------- trial construction ---------------- */
+
+function samplePositions(n, area, sep, item){
+  const half = item/2;
+  const lo = half, hi = area - half;
+  for(let attempt=0; attempt<400; attempt++){
+    const pts = [];
+    let ok = true;
+    for(let i=0;i<n;i++){
+      let placed = false;
+      for(let t=0;t<300;t++){
+        const x = lo + Math.random()*(hi-lo);
+        const y = lo + Math.random()*(hi-lo);
+        if(pts.every(p=>Math.hypot(p.x-x,p.y-y) >= sep)){ pts.push({x,y}); placed=true; break; }
+      }
+      if(!placed){ ok=false; break; }
+    }
+    if(ok) return pts;
+  }
+  /* fallback: relaxed grid */
+  const cols = Math.ceil(Math.sqrt(n));
+  const step = (hi-lo)/Math.max(cols-1,1);
+  const pts=[];
+  for(let i=0;i<n;i++) pts.push({x: lo + (i%cols)*step, y: lo + Math.floor(i/cols)*step});
+  return shuffle(pts);
+}
+
+function makeTrial(setSize, isChange, practice, block, idxInBlock){
+  const pal = CFG.paletteSize===7 ? PALETTE7 : PALETTE9;
+  const colours = shuffle(pal.slice()).slice(0, setSize);
+  const positions = samplePositions(setSize, CFG.areaSize, CFG.minSep, CFG.itemSize);
+  const probeIdx = rnd(setSize);
+  const oldColour = colours[probeIdx];
+  let probeColour = oldColour;
+  if(isChange){
+    const used = new Set(colours.map(c=>c.name));
+    const pool = pal.filter(c=>!used.has(c.name));
+    probeColour = pool[rnd(pool.length)];
+  }
+  return {practice, block, idxInBlock, setSize, isChange, colours, positions,
+          probeIdx, oldColour, probeColour};
+}
+
+function buildTrials(){
+  const plan = buildBlockPlan(CFG);
+  const list = [];
+
+  if(CFG.practice>0){
+    const half = CFG.practice/2;
+    const flags = shuffle([...Array(Math.floor(half)).fill(true), ...Array(CFG.practice-Math.floor(half)).fill(false)]);
+    const pSizes = CFG.setSizes;
+    flags.forEach((f,i)=> list.push(makeTrial(pSizes[i%pSizes.length], f, true, 0, i+1)));
+  }
+
+  plan.forEach(b=>{
+    const half = CFG.trialsPerBlock/2;
+    const flags = shuffle([...Array(half).fill(true), ...Array(half).fill(false)]);
+    flags.forEach((f,i)=> list.push(makeTrial(b.setSize, f, false, b.index, i+1)));
+  });
+  return list;
+}
+
+/* ---------------- rendering ---------------- */
+
+const arena = $('arena');
+
+function setupArena(){
+  arena.style.width = CFG.areaSize+'px';
+  arena.style.height = CFG.areaSize+'px';
+  placeFeedback();
+}
+
+/* Keep the feedback text clear of the fixation cross and of the array region.
+   It sits below the region, above it if the window is short, and only falls
+   back to the centre when neither fits, in which case the fixation is removed
+   for the duration of the feedback. */
+function placeFeedback(){
+  const el = $('feedback');
+  const gap = 34, textHalf = 76, margin = 12;
+  const vh = window.innerHeight;
+  const half = Math.min(CFG.areaSize, vh) / 2;
+  const below = vh/2 + half + gap;
+  const above = vh/2 - half - gap;
+
+  if(below + textHalf <= vh - margin){
+    el.style.top = below+'px';
+    S.feedbackOverlaps = false;
+  } else if(above - textHalf >= margin){
+    el.style.top = above+'px';
+    S.feedbackOverlaps = false;
+  } else {
+    el.style.top = '50%';
+    S.feedbackOverlaps = true;
+  }
+}
+
+window.addEventListener('resize', ()=>{ if(CFG.areaSize) placeFeedback(); });
+
+function clearArena(keepFixation=true){
+  arena.innerHTML = keepFixation ? '<div class="fixation">+</div>' : '';
+}
+
+function drawArray(trial){
+  clearArena();
+  trial.colours.forEach((col,i)=>{
+    const p = trial.positions[i];
+    const d = document.createElement('div');
+    d.className='item';
+    d.style.width = d.style.height = CFG.itemSize+'px';
+    d.style.left = (p.x - CFG.itemSize/2)+'px';
+    d.style.top  = (p.y - CFG.itemSize/2)+'px';
+    d.style.background = col.hex;
+    arena.appendChild(d);
+  });
+}
+
+function drawProbe(trial){
+  clearArena();
+  const p = trial.positions[trial.probeIdx];
+  const d = document.createElement('div');
+  d.className='item';
+  d.style.width = d.style.height = CFG.itemSize+'px';
+  d.style.left = (p.x - CFG.itemSize/2)+'px';
+  d.style.top  = (p.y - CFG.itemSize/2)+'px';
+  d.style.background = trial.probeColour.hex;
+  arena.appendChild(d);
+}
+
+/* ---------------- response ---------------- */
+
+function collectResponse(limitMs){
+  return new Promise(resolve=>{
+    const t0 = performance.now();
+    let done = false;
+    const finish = (resp)=>{
+      if(done) return; done = true;
+      document.removeEventListener('keydown', onKey);
+      $('btnSame').onclick = null;
+      $('btnDiff').onclick = null;
+      $('respbar').style.visibility='hidden';
+      resolve({resp, rt: Math.round(performance.now()-t0)});
+    };
+    const onKey = e=>{
+      const k = e.key.toLowerCase();
+      if(k===CFG.keys.same){ e.preventDefault(); finish('same'); }
+      else if(k===CFG.keys.diff){ e.preventDefault(); finish('different'); }
+    };
+    document.addEventListener('keydown', onKey);
+    if(CFG.showButtons){
+      $('respbar').style.visibility='visible';
+      $('btnSame').onclick = ()=>finish('same');
+      $('btnDiff').onclick = ()=>finish('different');
+    }
+    if(limitMs>0) setTimeout(()=>finish('none'), limitMs);
+  });
+}
+
+function faceSVG(mood){
+  const mouth = mood==='happy'
+    ? '<path d="M31 57 Q50 76 69 57" fill="none" stroke="#1c1c1c" stroke-width="6" stroke-linecap="round"/>'
+    : '<line x1="34" y1="65" x2="66" y2="65" stroke="#1c1c1c" stroke-width="6" stroke-linecap="round"/>';
+  return `<svg viewBox="0 0 100 100" width="124" height="124" role="img" aria-label="${mood==='happy'?'correct':'incorrect'}">
+      <circle cx="50" cy="50" r="44" fill="#ffd23f" stroke="#1c1c1c" stroke-width="5"/>
+      <circle cx="36" cy="41" r="5.5" fill="#1c1c1c"/>
+      <circle cx="64" cy="41" r="5.5" fill="#1c1c1c"/>
+      ${mouth}
+    </svg>`;
+}
+
+async function showFeedback(mood, caption){
+  if(CFG.tFb<=0) return;
+  const el = $('feedback');
+  if(S.feedbackOverlaps) clearArena(false);
+  el.innerHTML = faceSVG(mood) + (caption ? `<div class="caption">${caption}</div>` : '');
+  el.style.visibility='visible';
+  await wait(CFG.tFb);
+  el.style.visibility='hidden';
+  if(S.feedbackOverlaps) clearArena(true);
+}
+
+/* ---------------- experiment flow ---------------- */
+
+function showMessage(html){
+  return new Promise(resolve=>{
+    $('screen-task').classList.remove('active');
+    $('msgCard').innerHTML = html;
+    $('screen-message').classList.add('active');
+    const go = $('msgCard').querySelector('.go');
+    const advance = ()=>{
+      document.removeEventListener('keydown', onKey);
+      $('screen-message').classList.remove('active');
+      resolve();
+    };
+    const onKey = e=>{ if(e.code==='Space'||e.key==='Enter'){ e.preventDefault(); advance(); } };
+    document.addEventListener('keydown', onKey);
+    if(go) go.onclick = advance;
+  });
+}
+
+function instructionsHTML(){
+  const k = CFG.keys;
+  return `
+    <h2>How the task works</h2>
+    <ol>
+      <li>Keep your eyes on the small cross in the middle of the screen.</li>
+      <li>A set of coloured squares flashes up briefly. Remember their colours.</li>
+      <li>The screen goes blank for a moment.</li>
+      <li>One square comes back in a place a square appeared before.</li>
+      <li>Decide whether its colour matches the square that was there.</li>
+    </ol>
+    <div class="keys">
+      <div class="keycap">${k.sameLabel} &nbsp;or&nbsp; &#10003; &nbsp;=&nbsp; same colour</div>
+      <div class="keycap">${k.diffLabel} &nbsp;or&nbsp; &#10007; &nbsp;=&nbsp; different colour</div>
+    </div>
+    <p>The colour changes on half of the trials. Answer as accurately as you can, and do not worry about speed.</p>
+    <button class="go">${CFG.practice>0 ? 'Start practice' : 'Start the task'}</button>`;
+}
+
+async function runTrial(trial){
+  $('screen-task').classList.add('active');
+  clearArena();
+  await wait(CFG.tFix);
+
+  drawArray(trial);
+  const tOn = performance.now();
+  await wait(CFG.tExp);
+
+  clearArena();
+  const tOff = performance.now();
+  await wait(CFG.tRet);
+
+  drawProbe(trial);
+  const tProbe = performance.now();
+  const {resp, rt} = await collectResponse(CFG.tLimit);
+  clearArena();
+
+  const correctResp = trial.isChange ? 'different' : 'same';
+  const correct = resp===correctResp ? 1 : (resp==='none' ? '' : 0);
+
+  if(trial.practice || CFG.feedbackMain){
+    if(resp==='none') await showFeedback('neutral', 'Too slow');
+    else await showFeedback(correct===1 ? 'happy' : 'neutral');
+  }
+
+  await wait(CFG.tIti);
+
+  return {
+    ...trial,
+    resp, rt, correct,
+    actualExposure: Math.round(tOff - tOn),
+    actualRetention: Math.round(tProbe - tOff)
+  };
+}
+
+async function runExperiment(){
+  S.records = [];
+  S.aborted = false;
+  S.finished = false;
+  const trials = buildTrials();
+  const testTrials = trials.filter(t=>!t.practice);
+  setupArena();
+
+  await showMessage(instructionsHTML());
+
+  let lastBlock = null;
+  for(let i=0;i<trials.length;i++){
+    if(S.aborted) break;
+    const t = trials[i];
+
+    if(!t.practice && t.block!==lastBlock){
+      if(lastBlock===0 || lastBlock===null){
+        const nb = buildBlockPlan(CFG).length;
+        await showMessage(`
+          <h2>${CFG.practice>0 ? 'Practice finished' : 'Ready to start'}</h2>
+          <p>${CFG.practice>0
+              ? 'The task now begins for real.'
+              : 'The task begins now.'} ${CFG.feedbackMain
+              ? 'You will keep seeing a face after each answer.'
+              : 'You will no longer see a face after each answer.'}</p>
+          <p>Block 1 of ${nb}, with ${t.setSize} squares in each array.</p>
+          <button class="go">Begin block 1</button>`);
+      } else {
+        const total = buildBlockPlan(CFG).length;
+        await showMessage(`
+          <h2>Break</h2>
+          <p>Block ${t.block-1} of ${total} is done. Rest for as long as you need.</p>
+          <p>The next block shows ${t.setSize} squares in each array.</p>
+          <button class="go">Begin block ${t.block}</button>`);
+      }
+      lastBlock = t.block;
+    }
+    if(t.practice) lastBlock = 0;
+
+    const rec = await runTrial(t);
+    if(S.aborted) break;
+    S.records.push(rec);
+    const denom = trials.length;
+    $('progress').style.width = ((i+1)/denom*100)+'%';
+  }
+
+  finish();
+}
+
+/* ---------------- scoring ---------------- */
+
+function summarise(){
+  const rows = [];
+  const test = S.records.filter(r=>!r.practice && r.resp!=='none');
+  const sizes = [...new Set(test.map(r=>r.setSize))].sort((a,b)=>a-b);
+  sizes.forEach(N=>{
+    const sub = test.filter(r=>r.setSize===N);
+    const changes = sub.filter(r=>r.isChange);
+    const sames = sub.filter(r=>!r.isChange);
+    const hits = changes.filter(r=>r.resp==='different').length;
+    const fas  = sames.filter(r=>r.resp==='different').length;
+    const H = changes.length ? hits/changes.length : 0;
+    const FA = sames.length ? fas/sames.length : 0;
+    const acc = sub.length ? sub.filter(r=>r.correct===1).length/sub.length : 0;
+    const rts = sub.map(r=>r.rt).sort((a,b)=>a-b);
+    const med = rts.length ? (rts.length%2 ? rts[(rts.length-1)/2] : Math.round((rts[rts.length/2-1]+rts[rts.length/2])/2)) : '';
+    const kCowan = N*(H-FA);
+    const kPashler = FA<1 ? N*(H-FA)/(1-FA) : NaN;
+    rows.push({N, n:sub.length, nChange:changes.length, nSame:sames.length,
+               hits, fas, H, FA, acc, med, kCowan, kPashler});
+  });
+  return rows;
+}
+
+function finish(){
+  if(S.finished) return;
+  S.finished = true;
+  $('screen-task').classList.remove('active');
+  $('screen-message').classList.remove('active');
+  $('screen-config').classList.remove('active');
+  $('screen-results').classList.add('active');
+  $('respbar').style.visibility='hidden';
+
+  const rows = summarise();
+  const nTest = S.records.filter(r=>!r.practice).length;
+  const misses = S.records.filter(r=>!r.practice && r.resp==='none').length;
+
+  $('resTitle').textContent = S.aborted ? 'Session ended early' : 'Session complete';
+  $('resSub').textContent =
+    `Participant ${CFG.pid}${CFG.group?', group '+CFG.group:''}${CFG.age?', age '+CFG.age:''}. `+
+    `${nTest} test trials recorded${misses?`, ${misses} without a response`:''}.`;
+
+  if(!rows.length){
+    $('resTable').innerHTML = '<p>No scorable test trials were recorded.</p>';
+  } else {
+    const body = rows.map(r=>`
+      <tr>
+        <td>${r.N} items</td>
+        <td>${r.n}</td>
+        <td>${r.H.toFixed(2)}</td>
+        <td>${r.FA.toFixed(2)}</td>
+        <td>${(r.acc*100).toFixed(1)}%</td>
+        <td>${r.med}</td>
+        <td class="k-cell">${r.kCowan.toFixed(2)}</td>
+        <td>${isNaN(r.kPashler)?'\u2014':r.kPashler.toFixed(2)}</td>
+      </tr>`).join('');
+    $('resTable').innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Set size</th><th>Trials</th><th>Hit rate</th><th>False alarms</th>
+          <th>Accuracy</th><th>Median RT</th><th>K (Cowan)</th><th>K (Pashler)</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+  }
+  $('resNote').textContent =
+    'Cowan\u2019s K = N(H \u2212 FA) applies to the single-probe display used here. Pashler\u2019s K = N(H \u2212 FA)/(1 \u2212 FA) is reported alongside it for comparison with whole-display studies. Trials without a response are excluded from both.';
+}
+
+/* ---------------- data export ---------------- */
+
+function csvEscape(v){
+  const s = String(v==null?'':v);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+
+function trialCSV(){
+  const head = ['participant_id','group','age','session_start','practice','block','trial_in_block',
+    'trial_overall','set_size','change','probe_x','probe_y','probe_position_index',
+    'array_colours','colour_at_probe_location','probe_colour','response','correct_response',
+    'correct','rt_ms','exposure_requested_ms','exposure_actual_ms','retention_requested_ms',
+    'retention_actual_ms','fixation_ms','iti_ms','response_limit_ms','palette_size',
+    'item_size_px','area_px','min_separation_px','key_mapping','block_order','feedback_in_test'];
+  const lines = [head.join(',')];
+  S.records.forEach((r,i)=>{
+    lines.push([
+      CFG.pid, CFG.group, CFG.age, S.startISO, r.practice?1:0, r.block, r.idxInBlock, i+1,
+      r.setSize, r.isChange?1:0,
+      Math.round(r.positions[r.probeIdx].x), Math.round(r.positions[r.probeIdx].y), r.probeIdx+1,
+      r.colours.map(c=>c.name).join(' '), r.oldColour.name, r.probeColour.name,
+      r.resp, r.isChange?'different':'same', r.correct, r.rt,
+      CFG.tExp, r.actualExposure, CFG.tRet, r.actualRetention, CFG.tFix, CFG.tIti, CFG.tLimit,
+      CFG.paletteSize, CFG.itemSize, CFG.areaSize, CFG.minSep, CFG.keymap, CFG.order,
+      CFG.feedbackMain?1:0
+    ].map(csvEscape).join(','));
+  });
+  return lines.join('\n');
+}
+
+function summaryCSV(){
+  const head = ['participant_id','group','age','session_start','set_size','n_trials','n_change',
+    'n_nochange','hits','false_alarms','hit_rate','fa_rate','accuracy','median_rt_ms',
+    'k_cowan','k_pashler','terminated_early'];
+  const lines = [head.join(',')];
+  summarise().forEach(r=>{
+    lines.push([CFG.pid, CFG.group, CFG.age, S.startISO, r.N, r.n, r.nChange, r.nSame,
+      r.hits, r.fas, r.H.toFixed(4), r.FA.toFixed(4), r.acc.toFixed(4), r.med,
+      r.kCowan.toFixed(4), isNaN(r.kPashler)?'':r.kPashler.toFixed(4),
+      S.aborted?1:0].map(csvEscape).join(','));
+  });
+  return lines.join('\n');
+}
+
+function download(text, name){
+  const blob = new Blob([text], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+
+function stamp(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+/* ---------------- wiring ---------------- */
+
+document.querySelectorAll('#screen-config input, #screen-config select')
+  .forEach(el=>el.addEventListener('input', updateReadout));
+
+$('startBtn').onclick = ()=>{
+  CFG = readConfig();
+  if(validate(CFG).length) return;
+  S.startISO = new Date().toISOString();
+  $('screen-config').classList.remove('active');
+  $('progress').style.width='0%';
+  runExperiment();
+};
+
+$('abort').onclick = ()=>{
+  const done = S.records ? S.records.filter(r=>!r.practice).length : 0;
+  $('modalBody').textContent = done
+    ? `${done} test trials have been recorded. Ending now keeps them and takes you to the results.`
+    : 'No test trials have been recorded yet.';
+  $('modal').classList.add('active');
+};
+$('modalNo').onclick = ()=> $('modal').classList.remove('active');
+$('modalYes').onclick = ()=>{
+  $('modal').classList.remove('active');
+  S.aborted = true;
+  finish();
+};
+
+$('dlTrials').onclick = ()=> download(trialCSV(), `changedetect_trials_${CFG.pid||'na'}_${stamp()}.csv`);
+$('dlSummary').onclick = ()=> download(summaryCSV(), `changedetect_summary_${CFG.pid||'na'}_${stamp()}.csv`);
+$('backCfg').onclick = ()=>{
+  S.records = [];
+  $('screen-results').classList.remove('active');
+  $('screen-config').classList.add('active');
+  updateReadout();
+  window.scrollTo(0,0);
+};
+
+updateReadout();
+</script>
+</body>
+</html>
