@@ -113,6 +113,7 @@ button[disabled]{opacity:.4;cursor:not-allowed;filter:none}
   padding:10px 14px;border-radius:0 var(--radius) var(--radius) 0;
   font-size:14px;margin-bottom:14px;
 }
+.alert.soft{border-left-color:var(--signal);background:var(--signal-dim)}
 .alert:empty{display:none}
 
 /* ---------- runtime screens ---------- */
@@ -122,6 +123,7 @@ button[disabled]{opacity:.4;cursor:not-allowed;filter:none}
   position:fixed;inset:0;background:var(--grey-bg);z-index:40;
   display:none;align-items:center;justify-content:center;
 }
+#screen-task{flex-direction:column}
 #screen-message.active,#screen-task.active{display:flex}
 .msg-card{
   max-width:620px;background:var(--panel);border-radius:8px;
@@ -142,13 +144,17 @@ button[disabled]{opacity:.4;cursor:not-allowed;filter:none}
 
 #arena{position:relative}
 .item{position:absolute;border-radius:2px}
+.cell{position:absolute;border:2px solid rgba(0,0,0,.3);border-radius:10px;box-sizing:border-box}
 .fixation{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   color:#000;font-size:24px;line-height:1;user-select:none;
 }
+/* In the flow below the array, so the buttons can never sit on top of the
+   grid or the squares. Hidden with visibility, which keeps the space
+   reserved and stops the array shifting between trials. */
 #respbar{
-  position:fixed;left:0;right:0;bottom:34px;display:flex;
-  justify-content:center;gap:14px;visibility:hidden;
+  display:flex;justify-content:center;gap:14px;
+  margin-top:30px;flex-shrink:0;visibility:hidden;
 }
 #respbar button{
   background:rgba(255,255,255,.9);color:var(--ink);
@@ -224,25 +230,28 @@ tbody tr:last-child td{border-bottom:1px solid var(--line)}
 
   <fieldset>
     <legend>Design</legend>
-    <p class="hint">Choose one or two set sizes. With two, each runs in its own block.</p>
+    <p class="hint">Choose up to three set sizes. Each one runs in its own blocks.</p>
     <div class="setsizes" id="setsizes">
-      <label class="chk"><input type="checkbox" value="2"> 2 items</label>
+      <label class="chk"><input type="checkbox" value="1"> 1 item</label>
+      <label class="chk on"><input type="checkbox" value="2" checked> 2 items</label>
+      <label class="chk on"><input type="checkbox" value="3" checked> 3 items</label>
       <label class="chk"><input type="checkbox" value="4"> 4 items</label>
-      <label class="chk on"><input type="checkbox" value="6" checked> 6 items</label>
+      <label class="chk"><input type="checkbox" value="6"> 6 items</label>
       <label class="chk"><input type="checkbox" value="8"> 8 items</label>
     </div>
     <div class="grid" style="margin-top:18px">
       <div class="field">
         <label for="blocks">Blocks per set size</label>
-        <input type="number" id="blocks" value="3" min="1" max="20" step="1">
+        <input type="number" id="blocks" value="5" min="1" max="20" step="1">
       </div>
       <div class="field">
-        <label for="tpb">Trials per block <span class="unit">even</span></label>
-        <input type="number" id="tpb" value="30" min="2" max="200" step="2">
+        <label for="tpb">Trials per block</label>
+        <input type="number" id="tpb" value="10" min="1" max="200" step="1">
       </div>
       <div class="field">
         <label for="order">Block order</label>
         <select id="order">
+          <option value="random" selected>Random order of blocks</option>
           <option value="counter">Counterbalanced by participant number</option>
           <option value="asc">Smaller set size first</option>
           <option value="desc">Larger set size first</option>
@@ -251,7 +260,7 @@ tbody tr:last-child td{border-bottom:1px solid var(--line)}
       </div>
       <div class="field">
         <label for="practice">Practice trials <span class="unit">with feedback</span></label>
-        <input type="number" id="practice" value="8" min="0" max="60" step="2">
+        <input type="number" id="practice" value="5" min="0" max="60" step="1">
       </div>
     </div>
   </fieldset>
@@ -266,19 +275,19 @@ tbody tr:last-child td{border-bottom:1px solid var(--line)}
       </div>
       <div class="field">
         <label for="t_exp">Array exposure <span class="unit">ms</span></label>
-        <input type="number" id="t_exp" value="200" min="16" max="5000" step="10">
+        <input type="number" id="t_exp" value="900" min="16" max="5000" step="10">
       </div>
       <div class="field">
         <label for="t_ret">Retention interval <span class="unit">ms</span></label>
-        <input type="number" id="t_ret" value="900" min="0" max="10000" step="50">
+        <input type="number" id="t_ret" value="500" min="0" max="10000" step="50">
       </div>
       <div class="field">
         <label for="t_lim">Response limit <span class="unit">ms, 0 = none</span></label>
-        <input type="number" id="t_lim" value="5000" min="0" max="20000" step="100">
+        <input type="number" id="t_lim" value="10000" min="0" max="20000" step="100">
       </div>
       <div class="field">
         <label for="t_fb">Feedback duration <span class="unit">ms</span></label>
-        <input type="number" id="t_fb" value="500" min="0" max="3000" step="50">
+        <input type="number" id="t_fb" value="400" min="0" max="3000" step="50">
       </div>
       <div class="field">
         <label for="t_iti">Intertrial interval <span class="unit">ms</span></label>
@@ -289,18 +298,20 @@ tbody tr:last-child td{border-bottom:1px solid var(--line)}
 
   <fieldset>
     <legend>Display</legend>
+    <p class="hint">With the grid on, squares occupy the eight outer cells of a visible 3 &times; 3 grid, never the centre cell, which holds the fixation cross. Minimum separation then has no effect, since the cells fix the spacing.</p>
+    <label class="toggle" style="margin-bottom:16px"><input type="checkbox" id="gridlayout" checked> Place squares on a fixed 3 &times; 3 grid</label>
     <div class="grid">
       <div class="field">
         <label for="d_item">Square size <span class="unit">px</span></label>
-        <input type="number" id="d_item" value="46" min="10" max="200" step="2">
+        <input type="number" id="d_item" value="80" min="10" max="200" step="2">
       </div>
       <div class="field">
         <label for="d_area">Array region <span class="unit">px, square</span></label>
-        <input type="number" id="d_area" value="520" min="150" max="1200" step="10">
+        <input type="number" id="d_area" value="600" min="150" max="1200" step="10">
       </div>
       <div class="field">
         <label for="d_sep">Minimum separation <span class="unit">px, centre to centre</span></label>
-        <input type="number" id="d_sep" value="110" min="20" max="400" step="5">
+        <input type="number" id="d_sep" value="150" min="20" max="400" step="5">
       </div>
       <div class="field">
         <label for="palette">Colour set</label>
@@ -418,6 +429,8 @@ const KEYMAPS = {
   arrows: {same:'arrowleft',diff:'arrowright',sameLabel:'\u2190', diffLabel:'\u2192'}
 };
 
+const MAX_SET_SIZES = 3;
+
 let CFG = {};
 let S = {};
 
@@ -448,8 +461,8 @@ function paintSetSizeChips(){
   const n = boxes.filter(b=>b.checked).length;
   boxes.forEach(b=>{
     b.parentElement.classList.toggle('on', b.checked);
-    b.parentElement.classList.toggle('off', !b.checked && n>=2);
-    b.disabled = !b.checked && n>=2;
+    b.parentElement.classList.toggle('off', !b.checked && n>=MAX_SET_SIZES);
+    b.disabled = !b.checked && n>=MAX_SET_SIZES;
   });
 }
 
@@ -473,6 +486,7 @@ function readConfig(){
     itemSize: +$('d_item').value,
     areaSize: +$('d_area').value,
     minSep: +$('d_sep').value,
+    gridLayout: $('gridlayout').checked,
     paletteSize: +$('palette').value,
     keymap: km,
     keys: KEYMAPS[km],
@@ -485,11 +499,19 @@ function validate(c){
   const errs = [];
   if(!c.pid) errs.push('Enter a participant number.');
   if(!c.setSizes.length) errs.push('Select at least one set size.');
-  if(c.trialsPerBlock % 2 !== 0) errs.push('Trials per block must be even so change and no-change trials balance.');
+  if(c.trialsPerBlock < 1) errs.push('Each block needs at least one trial.');
   const maxN = Math.max(...c.setSizes, 0);
   if(c.paletteSize <= maxN) errs.push('The colour set must hold more colours than the largest set size, since a changed probe takes a colour absent from the array.');
-  const perRow = Math.floor(c.areaSize / c.minSep);
-  if(perRow*perRow < maxN) errs.push('The array region is too small for the largest set size at this minimum separation.');
+  if(c.gridLayout){
+    if(maxN > 8) errs.push('The 3 \u00d7 3 grid holds eight squares at most, since the centre cell stays empty.');
+    if(c.itemSize > c.areaSize/3 - 18)
+      errs.push('Each square must fit inside a grid cell. Reduce the square size or enlarge the array region.');
+  } else {
+    const perRow = Math.floor(c.areaSize / c.minSep);
+    if(perRow*perRow < maxN) errs.push('The array region is too small for the largest set size at this minimum separation.');
+    if(c.areaSize/2 - c.itemSize/2 <= keepOut(c.itemSize))
+      errs.push('The array region leaves no room outside the fixation cross at this square size. Enlarge the region or shrink the squares.');
+  }
   return errs;
 }
 
@@ -497,14 +519,26 @@ function updateReadout(){
   paintSetSizeChips();
   const c = readConfig();
   const errs = validate(c);
-  $('alert').textContent = errs.join(' ');
+  /* A region taller than the window is a warning, not an error: the task still
+     runs, but part of the array would sit off screen. */
+  const needed = c.areaSize + (c.showButtons ? 80 : 0) + 20;
+  const warn = (!errs.length && needed > window.innerHeight)
+    ? `The array region plus the response buttons need about ${needed} px of height, `+
+      `but this window is ${window.innerHeight} px. Reduce the array region, hide the `+
+      `buttons, or run the task full screen.`
+    : '';
+  $('alert').textContent = errs.length ? errs.join(' ') : warn;
+  $('alert').classList.toggle('soft', !errs.length && !!warn);
   $('startBtn').disabled = errs.length>0;
 
   const nBlocks = c.setSizes.length * c.blocksPerSize;
   const nTrials = nBlocks * c.trialsPerBlock;
   const perTrial = c.tFix + c.tExp + c.tRet + 900 + c.tIti + (c.feedbackMain ? c.tFb : 0);
   const mins = Math.round((nTrials*perTrial + c.practice*perTrial)/60000);
-  const seq = buildBlockPlan(c).map(b=>b.setSize).join(' \u2192 ');
+  const plan = buildBlockPlan(c);
+  const seq = (c.order==='random' && c.setSizes.length>1)
+    ? 'randomised when the task starts'
+    : plan.map(b=>b.setSize).join(' \u2192 ');
   $('readout').innerHTML =
     `<strong>${nBlocks}</strong> blocks &nbsp;·&nbsp; <strong>${nTrials}</strong> test trials` +
     (c.practice? ` &nbsp;·&nbsp; ${c.practice} practice` : '') +
@@ -522,15 +556,18 @@ function buildBlockPlan(c){
     let ordered = sizes.slice();
     if(c.order==='desc') ordered.reverse();
     if(c.order==='counter'){
+      /* Latin-square rotation: participant number decides the starting set size,
+         which reduces to a straight reversal when only two are selected. */
       const digits = (c.pid.match(/\d+/g)||['0']).join('');
-      if(parseInt(digits,10) % 2 === 1) ordered.reverse();
+      const rot = (parseInt(digits.slice(-9),10)||0) % ordered.length;
+      ordered = ordered.slice(rot).concat(ordered.slice(0,rot));
     }
+    seq = [];
     if(c.order==='alt'){
-      seq = [];
       for(let i=0;i<c.blocksPerSize*ordered.length;i++) seq.push(ordered[i%ordered.length]);
     } else {
-      seq = [];
       ordered.forEach(n=>{ for(let i=0;i<c.blocksPerSize;i++) seq.push(n); });
+      if(c.order==='random') seq = shuffle(seq);
     }
   }
   return seq.map((n,i)=>({index:i+1, setSize:n}));
@@ -538,9 +575,34 @@ function buildBlockPlan(c){
 
 /* ---------------- trial construction ---------------- */
 
+/* Radius of the exclusion zone at the centre of the region. No square may
+   encroach on it, so the fixation cross stays visible on every trial.
+   FIX_HALF covers half the height of the drawn cross, FIX_GAP the clear
+   margin left around it. */
+const FIX_HALF = 14, FIX_GAP = 8;
+const keepOut = item => item/2 + FIX_HALF + FIX_GAP;
+
+/* Centres of the eight outer cells of the 3 x 3 grid. The middle cell is left
+   out, so the fixation cross always sits on empty ground. */
+function gridCells(area){
+  const cell = area/3, out = [];
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
+    if(r===1 && c===1) continue;
+    out.push({x:(c+0.5)*cell, y:(r+0.5)*cell});
+  }
+  return out;
+}
+
 function samplePositions(n, area, sep, item){
+  if(CFG.gridLayout) return shuffle(gridCells(area)).slice(0, n);
   const half = item/2;
   const lo = half, hi = area - half;
+  const c = area/2, ko = keepOut(item);
+  /* Both shapes are axis-aligned boxes, so they stay apart whenever the
+     horizontal or the vertical offset alone clears the cross. Testing by
+     radius would let a square's corner reach the cross on the diagonal. */
+  const clearOfFixation = (x,y) => Math.max(Math.abs(x-c), Math.abs(y-c)) >= ko;
+
   for(let attempt=0; attempt<400; attempt++){
     const pts = [];
     let ok = true;
@@ -549,17 +611,23 @@ function samplePositions(n, area, sep, item){
       for(let t=0;t<300;t++){
         const x = lo + Math.random()*(hi-lo);
         const y = lo + Math.random()*(hi-lo);
+        if(!clearOfFixation(x,y)) continue;
         if(pts.every(p=>Math.hypot(p.x-x,p.y-y) >= sep)){ pts.push({x,y}); placed=true; break; }
       }
       if(!placed){ ok=false; break; }
     }
     if(ok) return pts;
   }
-  /* fallback: relaxed grid */
-  const cols = Math.ceil(Math.sqrt(n));
-  const step = (hi-lo)/Math.max(cols-1,1);
-  const pts=[];
-  for(let i=0;i<n;i++) pts.push({x: lo + (i%cols)*step, y: lo + Math.floor(i/cols)*step});
+
+  /* Fallback for a crowded region: an evenly spaced ring, which is clear of
+     the centre by construction. */
+  const r = Math.min(c - half, Math.max(ko*Math.SQRT2, (c - half)*0.72));
+  const phase = Math.random()*2*Math.PI;
+  const pts = [];
+  for(let i=0;i<n;i++){
+    const a = phase + i*2*Math.PI/n;
+    pts.push({x: c + r*Math.cos(a), y: c + r*Math.sin(a)});
+  }
   return shuffle(pts);
 }
 
@@ -583,16 +651,25 @@ function buildTrials(){
   const plan = buildBlockPlan(CFG);
   const list = [];
 
+  /* Half the trials change. With an odd block length the spare trial alternates
+     between change and no-change across successive blocks of the same set size,
+     so the two types stay as close to balanced as the design allows. */
+  function flagsFor(n, extraIsChange){
+    const half = Math.floor(n/2);
+    const nChange = half + (n%2 && extraIsChange ? 1 : 0);
+    return shuffle([...Array(nChange).fill(true), ...Array(n-nChange).fill(false)]);
+  }
+
   if(CFG.practice>0){
-    const half = CFG.practice/2;
-    const flags = shuffle([...Array(Math.floor(half)).fill(true), ...Array(CFG.practice-Math.floor(half)).fill(false)]);
+    const flags = flagsFor(CFG.practice, false);
     const pSizes = CFG.setSizes;
     flags.forEach((f,i)=> list.push(makeTrial(pSizes[i%pSizes.length], f, true, 0, i+1)));
   }
 
+  const seen = {};
   plan.forEach(b=>{
-    const half = CFG.trialsPerBlock/2;
-    const flags = shuffle([...Array(half).fill(true), ...Array(half).fill(false)]);
+    seen[b.setSize] = (seen[b.setSize]||0) + 1;
+    const flags = flagsFor(CFG.trialsPerBlock, seen[b.setSize] % 2 === 1);
     flags.forEach((f,i)=> list.push(makeTrial(b.setSize, f, false, b.index, i+1)));
   });
   return list;
@@ -605,6 +682,9 @@ const arena = $('arena');
 function setupArena(){
   arena.style.width = CFG.areaSize+'px';
   arena.style.height = CFG.areaSize+'px';
+  /* Collapse the button row entirely when it is switched off, so the array
+     stays centred rather than sitting above an empty strip. */
+  $('respbar').style.display = CFG.showButtons ? 'flex' : 'none';
   placeFeedback();
 }
 
@@ -614,11 +694,16 @@ function setupArena(){
    for the duration of the feedback. */
 function placeFeedback(){
   const el = $('feedback');
-  const gap = 34, textHalf = 76, margin = 12;
+  const gap = 26, textHalf = 76, margin = 10;
   const vh = window.innerHeight;
-  const half = Math.min(CFG.areaSize, vh) / 2;
-  const below = vh/2 + half + gap;
-  const above = vh/2 - half - gap;
+  /* The button row sits under the array, so the array is no longer centred in
+     the window. Measure where it actually is, and fall back to a calculated
+     position while the task screen is still hidden. */
+  const r = arena.getBoundingClientRect();
+  const aTop = r.height ? r.top    : vh/2 - Math.min(CFG.areaSize, vh)/2;
+  const aBot = r.height ? r.bottom : vh/2 + Math.min(CFG.areaSize, vh)/2;
+  const below = aBot + gap + textHalf;
+  const above = aTop - gap - textHalf;
 
   if(below + textHalf <= vh - margin){
     el.style.top = below+'px';
@@ -627,15 +712,32 @@ function placeFeedback(){
     el.style.top = above+'px';
     S.feedbackOverlaps = false;
   } else {
-    el.style.top = '50%';
+    el.style.top = ((aTop + aBot)/2)+'px';
     S.feedbackOverlaps = true;
   }
 }
 
-window.addEventListener('resize', ()=>{ if(CFG.areaSize) placeFeedback(); });
+window.addEventListener('resize', ()=>{
+  if(CFG.areaSize) placeFeedback();
+  if($('screen-config').classList.contains('active')) updateReadout();
+});
+
+/* The grid is part of the background, so it is redrawn with every clear and
+   stays visible during the array, the retention interval, the probe and the
+   feedback. */
+function gridHTML(){
+  if(!CFG.gridLayout) return '';
+  const cell = CFG.areaSize/3;
+  let html = '';
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
+    html += `<div class="cell" style="left:${c*cell+4}px;top:${r*cell+4}px;`+
+            `width:${cell-8}px;height:${cell-8}px"></div>`;
+  }
+  return html;
+}
 
 function clearArena(keepFixation=true){
-  arena.innerHTML = keepFixation ? '<div class="fixation">+</div>' : '';
+  arena.innerHTML = gridHTML() + (keepFixation ? '<div class="fixation">+</div>' : '');
 }
 
 function drawArray(trial){
@@ -741,7 +843,7 @@ function instructionsHTML(){
     <h2>How the task works</h2>
     <ol>
       <li>Keep your eyes on the small cross in the middle of the screen.</li>
-      <li>A set of coloured squares flashes up briefly. Remember their colours.</li>
+      <li>One or more coloured squares flash up briefly. Remember the colours.</li>
       <li>The screen goes blank for a moment.</li>
       <li>One square comes back in a place a square appeared before.</li>
       <li>Decide whether its colour matches the square that was there.</li>
@@ -756,6 +858,7 @@ function instructionsHTML(){
 
 async function runTrial(trial){
   $('screen-task').classList.add('active');
+  placeFeedback();
   clearArena();
   await wait(CFG.tFix);
 
@@ -922,7 +1025,8 @@ function trialCSV(){
     'array_colours','colour_at_probe_location','probe_colour','response','correct_response',
     'correct','rt_ms','exposure_requested_ms','exposure_actual_ms','retention_requested_ms',
     'retention_actual_ms','fixation_ms','iti_ms','response_limit_ms','palette_size',
-    'item_size_px','area_px','min_separation_px','key_mapping','block_order','feedback_in_test'];
+    'item_size_px','area_px','min_separation_px','grid_layout','key_mapping','block_order',
+    'feedback_in_test'];
   const lines = [head.join(',')];
   S.records.forEach((r,i)=>{
     lines.push([
@@ -932,7 +1036,8 @@ function trialCSV(){
       r.colours.map(c=>c.name).join(' '), r.oldColour.name, r.probeColour.name,
       r.resp, r.isChange?'different':'same', r.correct, r.rt,
       CFG.tExp, r.actualExposure, CFG.tRet, r.actualRetention, CFG.tFix, CFG.tIti, CFG.tLimit,
-      CFG.paletteSize, CFG.itemSize, CFG.areaSize, CFG.minSep, CFG.keymap, CFG.order,
+      CFG.paletteSize, CFG.itemSize, CFG.areaSize, CFG.minSep, CFG.gridLayout?1:0,
+      CFG.keymap, CFG.order,
       CFG.feedbackMain?1:0
     ].map(csvEscape).join(','));
   });
